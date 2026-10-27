@@ -57,3 +57,7 @@ python -m venv .venv
 - `test_tokenizer.py`: pruebas, incluida la comparación con `tiktoken`.
 - `demo.py`: entrena con `muestra.txt` y compara con GPT-4.
 - `muestra.txt`: texto de ejemplo en español para entrenar.
+
+## Licencia
+
+[MIT](LICENSE)
