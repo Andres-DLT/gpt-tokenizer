@@ -109,6 +109,18 @@ class TestMatchesOpenAI(unittest.TestCase):
                     self.assertEqual(ids, ref.encode(text, disallowed_special=()))
                     self.assertEqual(ours.decode(ids), text)
 
+    def test_from_tiktoken_file(self):
+        # Lo que hace la demo web: leer el archivo .tiktoken sin usar la librería.
+        import base64
+        from tokenizer import parse_tiktoken_file
+        ref = tiktoken.get_encoding("cl100k_base")
+        contents = "\n".join(f"{base64.b64encode(t).decode()} {r}" for t, r in ref._mergeable_ranks.items())
+        ours = PretrainedTokenizer.from_ranks("cl100k_base", parse_tiktoken_file(contents),
+                                              ref._pat_str, ref._special_tokens)
+        for text in TEXTS:
+            with self.subTest(text=text[:20]):
+                self.assertEqual(ours.encode(text, "none"), ref.encode(text, disallowed_special=()))
+
     def test_special(self):
         for ours, ref in self.pairs:
             text = "Hola<|endoftext|>mundo"

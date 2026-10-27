@@ -4,6 +4,8 @@ Tokenizador BPE (*Byte Pair Encoding*) a nivel de bytes, al estilo de GPT, const
 
 Con los vocabularios oficiales de OpenAI produce **exactamente los mismos ids** que `tiktoken` para GPT-2 (`gpt2`), GPT-4 (`cl100k_base`) y GPT-4o (`o200k_base`).
 
+**Demo en vivo: https://andres-dlt.github.io/gpt-tokenizer/**: el mismo `tokenizer.py` ejecutándose en el navegador con [Pyodide](https://pyodide.org). Puedes entrenar tu propio vocabulario y compararlo con el de GPT-4.
+
 ## Cómo funciona
 
 1. Se empieza con 256 tokens, uno por cada byte posible: cualquier texto en cualquier idioma se puede representar.
@@ -57,6 +59,16 @@ python -m venv .venv
 - `test_tokenizer.py`: pruebas, incluida la comparación con `tiktoken`.
 - `demo.py`: entrena con `muestra.txt` y compara con GPT-4.
 - `muestra.txt`: texto de ejemplo en español para entrenar.
+- `web/index.html`: la demo web.
+- `web/build.py`: prepara la web en `_site/` (página, tokenizador y vocabulario de GPT-4).
+- `.github/workflows/pages.yml`: en cada push a `main` pasa las pruebas y despliega la demo en GitHub Pages.
+
+Para ver la web en local:
+
+```bash
+.venv/Scripts/python web/build.py _site
+.venv/Scripts/python -m http.server 8000 -d _site
+```
 
 ## Licencia
 

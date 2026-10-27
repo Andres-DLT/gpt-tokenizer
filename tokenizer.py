@@ -338,6 +338,17 @@ def recover_merges(mergeable_ranks):
     return merges
 
 
+def parse_tiktoken_file(contents):
+    """Lee el formato .tiktoken de OpenAI: una línea "<bytes en base64> <rango>" por token."""
+    import base64
+    ranks = {}
+    for line in contents.splitlines():
+        if line:
+            token, rank = line.split()
+            ranks[base64.b64decode(token)] = int(rank)
+    return ranks
+
+
 class PretrainedTokenizer(RegexTokenizer):
     """
     Reproduce gpt2, cl100k_base (GPT-4/GPT-3.5) u o200k_base (GPT-4o) token a token.
@@ -347,9 +358,18 @@ class PretrainedTokenizer(RegexTokenizer):
     def __init__(self, encoding_name="cl100k_base"):
         import tiktoken
         enc = tiktoken.get_encoding(encoding_name)
-        mergeable_ranks = enc._mergeable_ranks
-        super().__init__(pattern=enc._pat_str)
-        self.name = encoding_name
+        self._setup(encoding_name, enc._mergeable_ranks, enc._pat_str, enc._special_tokens)
+
+    @classmethod
+    def from_ranks(cls, name, mergeable_ranks, pattern, special_tokens):
+        """Sin tiktoken (p. ej. en el navegador), a partir de un archivo .tiktoken ya leído."""
+        tok = cls.__new__(cls)
+        tok._setup(name, mergeable_ranks, pattern, special_tokens)
+        return tok
+
+    def _setup(self, name, mergeable_ranks, pattern, special_tokens):
+        RegexTokenizer.__init__(self, pattern=pattern)
+        self.name = name
         self.merges = recover_merges(mergeable_ranks)
         # En estos vocabularios los 256 tokens de un byte no tienen id = valor del
         # byte (en GPT-2 se ordenaron para que los imprimibles fueran primero).
@@ -357,7 +377,7 @@ class PretrainedTokenizer(RegexTokenizer):
         self.byte_shuffle = {i: mergeable_ranks[bytes([i])] for i in range(256)}
         self.inverse_byte_shuffle = {v: k for k, v in self.byte_shuffle.items()}
         self.vocab = self._build_vocab()
-        self.register_special_tokens(enc._special_tokens)
+        self.register_special_tokens(special_tokens)
 
     def _encode_bytes(self, text_bytes):
         return super()._encode_bytes(bytes(self.byte_shuffle[b] for b in text_bytes))

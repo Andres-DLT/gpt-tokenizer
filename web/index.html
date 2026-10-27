@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpt-tokenizer</title>
+<meta name="description" content="Tokenizador BPE estilo GPT construido desde cero en Python y ejecutado en el navegador.">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --text: #1d1d1b;
+    --muted: #6b6b66;
+    --border: #e3e2dd;
+    --accent: #2f6fde;
+    --accent-text: #ffffff;
+    --code-bg: #f0efeb;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615;
+      --surface: #1f1f1d;
+      --text: #ecebe6;
+      --muted: #9a9993;
+      --border: #33332f;
+      --accent: #6b9cff;
+      --accent-text: #0e1420;
+      --code-bg: #2a2a27;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161615;
+    --surface: #1f1f1d;
+    --text: #ecebe6;
+    --muted: #9a9993;
+    --border: #33332f;
+    --accent: #6b9cff;
+    --accent-text: #0e1420;
+    --code-bg: #2a2a27;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 40px 16px 64px; }
+  header h1 { margin: 0 0 6px; font-size: 2rem; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); }
+  header .links { margin-top: 10px; font-size: 0.95rem; }
+  a { color: var(--accent); }
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin: 20px 0 8px; padding: 6px 12px;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--muted); font-size: 0.9rem;
+  }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d9a400; }
+  .status.ready .dot { background: #2e9d5b; }
+  .status.error .dot { background: #d64545; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-top: 20px;
+  }
+  section h2 { margin: 0 0 12px; font-size: 1.15rem; }
+  textarea {
+    width: 100%; min-height: 96px; resize: vertical;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; color: var(--text);
+    padding: 7px 14px; font: inherit; font-size: 0.92rem; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+  .seg button:disabled { opacity: 0.5; cursor: default; }
+  .btn {
+    border: 0; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+    background: var(--accent); color: var(--accent-text); font: inherit; font-weight: 600;
+  }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.92rem; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+  .stat { background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 0.85rem; }
+  .tokens {
+    min-height: 60px; padding: 12px; border-radius: 8px; background: var(--bg);
+    font: 15px/1.9 ui-monospace, "Cascadia Code", Consolas, monospace;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .tok { border-radius: 3px; padding: 1px 0; }
+  .tok.bytes { outline: 1px dashed var(--muted); font-size: 0.8em; padding: 1px 3px; margin: 0 1px; }
+  .tok .nl { color: var(--muted); }
+  .ids {
+    margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--code-bg);
+    font: 13px/1.6 ui-monospace, Consolas, monospace; color: var(--muted); word-break: break-all;
+  }
+  .hint { color: var(--muted); font-size: 0.9rem; margin: 6px 0 0; }
+  .merges {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px;
+    margin-top: 12px; font: 13px/1.5 ui-monospace, Consolas, monospace;
+  }
+  .merges div { background: var(--bg); border-radius: 6px; padding: 5px 8px; }
+  .merges .n { color: var(--muted); }
+  input[type="range"] { width: 200px; accent-color: var(--accent); }
+  ol.how { margin: 0; padding-left: 20px; }
+  ol.how li + li { margin-top: 6px; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 0.9rem; text-align: center; }
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.6rem; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    input[type="range"] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>gpt-tokenizer</h1>
+    <p>Tokenizador BPE estilo GPT, escrito desde cero en Python y ejecutándose aquí mismo, en tu navegador.</p>
+    <div class="links">por Andres de la Torre Flores · <a href="https://github.com/Andres-DLT/gpt-tokenizer">código en GitHub</a></div>
+  </header>
+
+  <div class="status" id="status"><span class="dot"></span><span id="status-text">Cargando Python en el navegador…</span></div>
+
+  <section>
+    <h2>Prueba el tokenizador</h2>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Tokenizador">
+        <button id="tab-mio" aria-pressed="true" disabled>Mi tokenizador</button>
+        <button id="tab-gpt4" aria-pressed="false" disabled>GPT-4 (cl100k_base)</button>
+      </div>
+      <label class="check"><input type="checkbox" id="show-ids"> mostrar ids</label>
+    </div>
+    <textarea id="input" spellcheck="false">La información se convierte en bytes, y los bytes en tokens. ¿Cuántos tokens tiene esta frase? En 2026, 1234567 🚀</textarea>
+    <div class="stats">
+      <div class="stat"><b id="s-tokens">–</b><span>tokens</span></div>
+      <div class="stat"><b id="s-chars">–</b><span>caracteres</span></div>
+      <div class="stat"><b id="s-bytes">–</b><span>bytes UTF-8</span></div>
+      <div class="stat"><b id="s-ratio">–</b><span>bytes por token</span></div>
+    </div>
+    <div class="tokens" id="tokens"></div>
+    <div class="ids" id="ids" hidden></div>
+    <p class="hint">Cada color es un token. Los recuadros punteados son bytes sueltos: trozos de un carácter UTF-8 que el tokenizador no llegó a fusionar.</p>
+  </section>
+
+  <section>
+    <h2>Entrena el tuyo</h2>
+    <p class="hint" style="margin-top:0">Edita el texto de entrenamiento, elige el tamaño del vocabulario y entrena. El resultado se usa en “Mi tokenizador”.</p>
+    <div class="row">
+      <label for="vocab">Vocabulario: <b id="vocab-label">512</b> tokens</label>
+      <input type="range" id="vocab" min="256" max="1280" step="16" value="512">
+      <button class="btn" id="train" disabled>Entrenar</button>
+    </div>
+    <textarea id="corpus" spellcheck="false" style="min-height:140px"></textarea>
+    <p class="hint" id="train-info"></p>
+    <div class="merges" id="merges"></div>
+  </section>
+
+  <section>
+    <h2>Cómo funciona</h2>
+    <ol class="how">
+      <li>Se empieza con 256 tokens, uno por cada byte posible, así que cualquier texto en cualquier idioma se puede representar.</li>
+      <li>Una expresión regular corta el texto en trozos (palabras, números, signos y espacios) para no mezclar, por ejemplo, una palabra con la coma que la sigue.</li>
+      <li>Se cuenta qué pareja de tokens consecutivos aparece más, se fusiona en un token nuevo y se repite hasta llegar al tamaño de vocabulario.</li>
+      <li>Para codificar se aplican las fusiones en el orden en que se aprendieron; para decodificar se juntan los bytes de cada token.</li>
+    </ol>
+    <p class="hint">La pestaña GPT-4 usa el vocabulario oficial <code>cl100k_base</code> con este mismo código: las fusiones se reconstruyen a partir de los rangos y los ids coinciden exactamente con los de <code>tiktoken</code>.</p>
+  </section>
+
+  <footer>Andres de la Torre Flores · Licencia MIT · Python en el navegador con <a href="https://pyodide.org">Pyodide</a></footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
+<script>
+const PY_GLUE = `
+import json, time
+from tokenizer import RegexTokenizer, PretrainedTokenizer, parse_tiktoken_file, render_token
+
+tokenizers = {}
+
+def train(corpus, vocab_size):
+    t0 = time.time()
+    tok = RegexTokenizer()
+    tok.train(corpus, vocab_size)
+    tok.register_special_tokens({"<|endoftext|>": vocab_size})
+    seconds = time.time() - t0
+    tokenizers["mio"] = tok
+    merges = [[render_token(tok.vocab[p0]), render_token(tok.vocab[p1]), render_token(tok.vocab[idx]), idx]
+              for (p0, p1), idx in list(tok.merges.items())[:60]]
+    return json.dumps({"seconds": seconds, "num_merges": len(tok.merges), "merges": merges,
+                       "corpus_bytes": len(corpus.encode("utf-8")),
+                       "corpus_tokens": len(tok.encode(corpus, "all"))})
+
+def load_gpt4(ranks_text, meta_json):
+    meta = json.loads(meta_json)
+    t0 = time.time()
+    tokenizers["gpt4"] = PretrainedTokenizer.from_ranks(
+        "cl100k_base", parse_tiktoken_file(ranks_text), meta["pattern"], meta["special_tokens"])
+    return time.time() - t0
+
+def tokenize(name, text):
+    tok = tokenizers[name]
+    out = []
+    for idx in tok.encode(text, "all"):
+        b = tok._token_bytes(idx)
+        try:
+            out.append([idx, b.decode("utf-8"), False])
+        except UnicodeDecodeError:
+            out.append([idx, " ".join(f"{x:02X}" for x in b), True])
+    return json.dumps(out)
+`;
+
+const $ = (id) => document.getElementById(id);
+let py = null;
+let current = "mio";
+let gpt4State = "none"; // none | loading | ready
+let debounce = null;
+
+const tick = () => new Promise((r) => setTimeout(r, 30)); // deja pintar antes de un cálculo largo
+
+function setStatus(text, kind) {
+  $("status-text").textContent = text;
+  $("status").className = "status" + (kind ? " " + kind : "");
+}
+
+function color(i) {
+  const hues = [210, 140, 30, 280, 350, 180, 55, 250];
+  return `hsl(${hues[i % hues.length]} 75% 55% / 0.28)`;
+}
+
+function render() {
+  if (!py || (current === "gpt4" && gpt4State !== "ready")) return;
+  const text = $("input").value;
+  const tokens = JSON.parse(py.globals.get("tokenize")(current, text));
+  const bytes = new TextEncoder().encode(text).length;
+  $("s-tokens").textContent = tokens.length.toLocaleString("es");
+  $("s-chars").textContent = [...text].length.toLocaleString("es");
+  $("s-bytes").textContent = bytes.toLocaleString("es");
+  $("s-ratio").textContent = tokens.length ? (bytes / tokens.length).toFixed(2) : "–";
+
+  const box = $("tokens");
+  box.replaceChildren();
+  tokens.forEach(([id, s, isBytes], i) => {
+    const span = document.createElement("span");
+    span.className = "tok" + (isBytes ? " bytes" : "");
+    span.style.background = color(i);
+    span.title = `id ${id}`;
+    if (!isBytes && s.includes("\n")) {
+      s.split("\n").forEach((part, j) => {
+        if (j > 0) {
+          const nl = document.createElement("span");
+          nl.className = "nl";
+          nl.textContent = "↵";
+          span.append(nl, "\n");
+        }
+        span.append(part);
+      });
+    } else {
+      span.textContent = s;
+    }
+    box.append(span);
+  });
+  $("ids").textContent = "[" + tokens.map((t) => t[0]).join(", ") + "]";
+}
+
+async function train() {
+  $("train").disabled = true;
+  const vocab = Number($("vocab").value);
+  setStatus(`Entrenando con ${vocab} tokens…`);
+  await tick();
+  const r = JSON.parse(py.globals.get("train")($("corpus").value, vocab));
+  $("train-info").textContent =
+    `${r.num_merges} fusiones aprendidas en ${r.seconds.toFixed(2)} s. ` +
+    `El texto de entrenamiento pasa de ${r.corpus_bytes.toLocaleString("es")} bytes a ` +
+    `${r.corpus_tokens.toLocaleString("es")} tokens (x${(r.corpus_bytes / r.corpus_tokens).toFixed(2)}). ` +
+    `Primeras fusiones:`;
+  const grid = $("merges");
+  grid.replaceChildren();
+  for (const [a, b, ab, idx] of r.merges) {
+    const d = document.createElement("div");
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = idx + "  ";
+    d.append(n, `[${a}] + [${b}] → [${ab}]`);
+    grid.append(d);
+  }
+  $("train").disabled = false;
+  setStatus("Listo", "ready");
+  render();
+}
+
+async function selectTab(name) {
+  current = name;
+  $("tab-mio").setAttribute("aria-pressed", name === "mio");
+  $("tab-gpt4").setAttribute("aria-pressed", name === "gpt4");
+  if (name === "gpt4" && gpt4State === "none") {
+    gpt4State = "loading";
+    try {
+      setStatus("Descargando el vocabulario de GPT-4 (1,7 MB)…");
+      const [ranks, meta] = await Promise.all([
+        fetch("cl100k_base.tiktoken").then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }),
+        fetch("cl100k_base.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }),
+      ]);
+      setStatus("Reconstruyendo las 100.000 fusiones de GPT-4…");
+      await tick();
+      const secs = py.globals.get("load_gpt4")(ranks, meta);
+      gpt4State = "ready";
+      setStatus(`GPT-4 listo (fusiones reconstruidas en ${secs.toFixed(1)} s)`, "ready");
+    } catch (e) {
+      gpt4State = "none";
+      setStatus("No se pudo cargar el vocabulario de GPT-4", "error");
+      console.error(e);
+      return;
+    }
+  }
+  render();
+}
+
+async function main() {
+  try {
+    py = await loadPyodide();
+    await py.loadPackage("regex");
+    const [code, corpus] = await Promise.all([
+      fetch("tokenizer.py").then((r) => r.text()),
+      fetch("muestra.txt").then((r) => r.text()),
+    ]);
+    py.FS.writeFile("/home/pyodide/tokenizer.py", code);
+    py.runPython("import sys; sys.path.insert(0, '/home/pyodide')");
+    py.runPython(PY_GLUE);
+    $("corpus").value = corpus;
+    $("tab-mio").disabled = false;
+    $("tab-gpt4").disabled = false;
+    await train();
+  } catch (e) {
+    setStatus("Error al cargar: " + e.message, "error");
+    console.error(e);
+  }
+}
+
+$("tab-mio").addEventListener("click", () => selectTab("mio"));
+$("tab-gpt4").addEventListener("click", () => selectTab("gpt4"));
+$("train").addEventListener("click", train);
+$("vocab").addEventListener("input", (e) => ($("vocab-label").textContent = e.target.value));
+$("show-ids").addEventListener("change", (e) => ($("ids").hidden = !e.target.checked));
+$("input").addEventListener("input", () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(render, 120);
+});
+main();
+</script>
+</body>
+</html>
