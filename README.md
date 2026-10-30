@@ -70,6 +70,12 @@ Para ver la web en local:
 .venv/Scripts/python -m http.server 8000 -d _site
 ```
 
+## Créditos
+
+La estructura y parte del código siguen a [minbpe](https://github.com/karpathy/minbpe) de
+Andrej Karpathy. A diferencia de minbpe, aquí el tokenizador preentrenado sirve para GPT-2,
+GPT-4 y GPT-4o, y hay una demo web.
+
 ## Licencia
 
-[MIT](LICENSE)
+[MIT](LICENSE). Incluye el aviso de licencia de minbpe.
